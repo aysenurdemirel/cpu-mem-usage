@@ -1,13 +1,53 @@
 #include "syscpu.h"
 
+enum proc{
+	eUser = 2,
+	eNice,
+	eSystem,
+	eIdle,
+	eIowait,
+	eIrq,
+	eSoftirq,
+	eSteal,
+};
+
+struct procStat{
+	double user;
+	double nice;
+	double system;
+	double idle;
+	double iowait;
+	double irq;
+	double softirq;
+	double steal;
+};
+
+struct prev_procStat{
+	double prev_idle = 0;
+	double prev_iowait = 0;
+	double prev_user = 0;
+	double prev_nice = 0;
+	double prev_system = 0;
+	double prev_irq = 0;
+	double prev_softirq = 0;
+	double prev_steal = 0;
+};
+
 SysCPU::SysCPU()
 {
 
 }
 
-void SysCPU::calculateSysCPU()
+SysCPU::~SysCPU(){
+	if(syscpu_thr.joinable()){
+		stopThread();
+	}
+}
+
+void SysCPU::calculate_usage()
 {
 	procStat inf;
+	prev_procStat pInf;
 
 	char filePath[50] = "/proc/stat";
 	std::ifstream fileStat;
@@ -50,8 +90,8 @@ void SysCPU::calculateSysCPU()
 
 	fileStat.close();
 
-	double prevIdle = prev_idle + prev_iowait;
-	double prevNonIdle = prev_user + prev_nice + prev_system + prev_irq + prev_softirq + prev_steal;
+	double prevIdle = pInf.prev_idle + pInf.prev_iowait;
+	double prevNonIdle = pInf.prev_user + pInf.prev_nice + pInf.prev_system + pInf.prev_irq + pInf.prev_softirq + pInf.prev_steal;
 	double prevTotal = prevIdle + prevNonIdle;
 
 	double idle = inf.idle - inf.iowait;
@@ -64,18 +104,30 @@ void SysCPU::calculateSysCPU()
 	totalCPU_percentage = (totald - idled) / totald;
 }
 
-void SysCPU::callUsage(){
-	while(1){
-		calculateSysCPU();
-		sleep(1);
-	}
-}
-
-double SysCPU::getSysCPU()
-{
+double SysCPU::getSysCPU(){
 	return totalCPU_percentage;
 }
 
+bool SysCPU::callUsage(){
+	while(stop_bool){
+		{
+			std::unique_lock <std::mutex> lock_usage(mutex_pid);
+			cv.wait_for(lock_usage, std::chrono::seconds(1));
+			if (!stop_bool){
+				break;
+			}
+		}
+		calculate_usage();
+	}
+	return stop_bool;
+}
+
 void SysCPU::runThread(){
-	sys_t = std::thread(&SysCPU::callUsage, this);
+	syscpu_thr = std::thread(&SysCPU::callUsage, this);
+}
+
+void SysCPU::stopThread(){
+	stop_bool = false;
+	cv.notify_one();
+	syscpu_thr.join();
 }

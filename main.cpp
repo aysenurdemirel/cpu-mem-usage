@@ -1,43 +1,75 @@
 #include <pidcpu.h>
+#include <pidmem.h>
 #include <sysmem.h>
 #include <syscpu.h>
 #include <thread>
-#include <functional>
+#include <mutex>
+#include <future>
+#include <chrono>
+#include <cpumem_usage.h>
 
 int main(int argc, char* argv[])
 {
-    PidCPU objP = PidCPU(argv[1]);
-	SysCPU objT;
-	SysMem objM;
+	PidCPU objPC;
+	PidMem objPM;
+	SysCPU objSC;
+	SysMem objSM;
+	CpuMem_Usage* obj_cpumem = new CpuMem_Usage;
 
-	objP.runThread();
-	objT.runThread();
-	objM.runThread();
+	int count = 0;
 
-    while(1){
-		std::cout << "memory_utilized:: %" << objM.getSysMem() << std::endl;
+	if(argc > 1){
+		obj_cpumem = &objPC;
+		obj_cpumem->runThread();
+		objPC.setPid(argv[1]);
 
-		if(argc <= 1 || std::stod(argv[1]) < 0){
-			std::cout << "System_CPU: %" << objT.getSysCPU() << std::endl << std::endl;
-        }
-        else {
-            std::cout << "pid_CPU: %" << objP.getPidCPU() << std::endl << std::endl;
-        }
+		obj_cpumem = &objPM;
+		obj_cpumem->runThread();
+		objPM.setPid(argv[1]);
 
-		sleep(5);
-    }
+
+	}
+
+	else{
+		obj_cpumem = &objSC;
+		obj_cpumem->runThread();
+
+		obj_cpumem = &objSM;
+		obj_cpumem->runThread();
+	}
+
+	while(1){
+		count++;
+
+		if(argc > 1){			
+			std::cout << "Pid CPU Usage: %" << objPC.getPidCPU() << std::endl;
+			std::cout << "Pid Mem Usage: " << objPM.getPidMemVm() << std::endl;
+			std::cout << "Resident Set Size: " << objPM.getPidMemRss() << std::endl << std::endl;
+
+			if(count == 10){
+				obj_cpumem = &objPC;
+				obj_cpumem->stopThread();
+
+				obj_cpumem = &objPM;
+				obj_cpumem->stopThread();
+				break;
+			}
+		}
+
+		else {
+			std::cout << "System CPU Usage: %" << objSC.getSysCPU() << std::endl;
+			std::cout << "System Memory Usage: %" << objSM.getSysMem() << std::endl << std::endl;
+
+			if(count == 10){
+				obj_cpumem = &objSC;
+				obj_cpumem->stopThread();
+
+				obj_cpumem = &objSM;
+				obj_cpumem->stopThread();
+				break;
+			}
+		}
+		sleep(1);
+	}
+	return 0;
 }
-
-//run thread olacak threadler orada saniyede bir dönecek
-// main de istediği sürede çalıştıracak
-
-
-// utime ve stime için after before yap belki olur
-
-/*
-gencler yarin da thread e bakiyorsunuz
-sonra cpu olcme projenizde thread ekleyeceksiniz
-her saniye cpu olcup saklayacak her class kendi icinde ben istedigim zaman alacagim usage i
-
-ve pzt ye 2nizin de github hesabi acip oraya cpu projesini guzel bir sekilde atmaniz lazim
-*/

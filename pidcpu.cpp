@@ -1,11 +1,40 @@
 #include "pidcpu.h"
 
-PidCPU::PidCPU(std::string pId)
+enum proc_stat{
+	pIdle = 11,
+	uTime,
+	sTime,
+	cuTime,
+	csTime,
+	startTime = 20
+};
+
+struct cpu_info{
+	double utime;     //14 user code harcanan clock ticks
+	double stime;     //15 kernel code harcanan clock ticks
+	double cutime;    //16 in user code waited for childrens cpu time spent
+	double cstime;    //17 in kernel code
+	double starttime; //22
+	double uptime;
+};
+
+PidCPU::PidCPU()
 {
-    pid = pId;
+
 }
 
-void PidCPU::calculatePidCPU(){
+PidCPU::~PidCPU()
+{
+	if(pidcpu_thr.joinable()){
+		stopThread();
+	}
+}
+
+void PidCPU::setPid(std::string pId){
+	pid = pId;
+}
+
+void PidCPU::calculate_usage(){
     cpu_info cpuInfo;
 
     char filePath[50] = "/proc/";
@@ -59,18 +88,30 @@ void PidCPU::calculatePidCPU(){
     fileUptime.close();
 }
 
-void PidCPU::callUsage(){
-	while(1){
-		calculatePidCPU();
-		sleep(1);
+bool PidCPU::callUsage(){
+	while(stop_bool){
+		{
+			std::unique_lock <std::mutex> lock_usage(mutex_pid);
+			cv.wait_for(lock_usage, std::chrono::seconds(1));
+			if (!stop_bool){
+				break;
+			}
+		}
+		calculate_usage();
 	}
+	return stop_bool;
 }
 
-double PidCPU::getPidCPU()
-{
+double PidCPU::getPidCPU(){
     return cpu_usage;
 }
 
 void PidCPU::runThread(){
-	pid_t = std::thread(&PidCPU::callUsage, this);
+	pidcpu_thr = std::thread(&PidCPU::callUsage, this);
+}
+
+void PidCPU::stopThread(){
+	stop_bool = false;
+	cv.notify_one();
+	pidcpu_thr.join();
 }

@@ -5,29 +5,31 @@
 #include <fstream>
 #include <unistd.h>
 #include <thread>
+#include <chrono>
+#include <mutex>
+#include <condition_variable>
+#include <cpumem_usage.h>
 
-enum eMemory{
-    eTotal = 1,
-    eAvailable = 3
-};
-
-struct memory_info{
-    double total;
-    double available;
-};
-
-class SysMem
+class SysMem : public CpuMem_Usage
 {
-private:
-    double memory_utilized;
-	std::thread mem_t;
-
 public:
 	SysMem();
-	void calculateSysMem();
-	void callUsage();
+	~SysMem();
 	double getSysMem();
 	void runThread();
+
+
+
+private:
+	void calculate_usage();
+	bool callUsage();
+	void stopThread();
+
+    double memory_utilized;
+	bool stop_bool = true;
+	std::thread sysmem_thr;
+	std::mutex mutex_pid;
+	std::condition_variable cv;
 };
 
 #endif // SYSMEM_H

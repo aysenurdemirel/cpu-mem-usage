@@ -1,34 +1,33 @@
-#ifndef PIDCPU_H
-#define PIDCPU_H
+#ifndef PIDMEM_H
+#define PIDMEM_H
 
 #include <iostream>
 #include <fstream>
-#include <sys/stat.h>
-#include <cstring>
 #include <unistd.h>
+#include <cstring>
 #include <thread>
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
 #include <cpumem_usage.h>
 
-class PidCPU : public CpuMem_Usage
+class PidMem : public CpuMem_Usage
 {
 public:
-	PidCPU();
-	~PidCPU();
+	PidMem();
+	~PidMem();
 	void setPid(std::string pId);
-	double getPidCPU();
+	double getPidMemVm();
+	double getPidMemRss();
 	void runThread();
 
 private:
-    std::string pid = "";
-    double seconds = 0;
-    double hertz = sysconf(_SC_CLK_TCK);
-    double total_time = 0;
-    double cpu_usage;
+	std::string pid = "";
+	double vm_usage = 0;
+	double resident_set = 0;
+	double page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024;
 	bool stop_bool = true;
-	std::thread pidcpu_thr;
+	std::thread pidmem_thr;
 	std::mutex mutex_pid;
 	std::condition_variable cv;
 
@@ -37,6 +36,4 @@ private:
 	void stopThread();
 };
 
-#endif // PIDCPU_H
-
-
+#endif // PIDMEM_H
